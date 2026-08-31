@@ -24,18 +24,16 @@ def draw_bg():
     
 
 class Soldier(pygame.sprite.Sprite):
-    def __init__(self, x, y, scale):
+    def __init__(self,char_type, x, y, scale):
         pygame.sprite.Sprite.__init__(self)
+        self.char_type = char_type
         self.speed = 5
         self.direction = 1
         self.flip = False
-        img = pygame.image.load("shoot_game/img/player/Idle/0.png")
+        img = pygame.image.load(f"shoot_game/img/{self.char_type}/Idle/0.png")
         self.image = pygame.transform.scale(img, (img.get_width() * scale, img.get_height() * scale))
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-    
-    def draw(self, surface):
-        surface.blit(self.image, self.rect)
 
     def move(self, moving_left, moving_right):
         #reset movement variables
@@ -49,8 +47,12 @@ class Soldier(pygame.sprite.Sprite):
             self.flip = False
             self.direction = 1
         self.rect.x += dx
+        
+    def draw(self, surface):
+        surface.blit(pygame.transform.flip(self.image, self.flip, False), self.rect)
 
-player = Soldier(200, 200, 3)
+player = Soldier('player', 200, 200, 3)
+enemy = Soldier('enemy', 400, 200, 3)
 
 run = True
 while run:
@@ -58,6 +60,7 @@ while run:
     draw_bg()
     player.move(moving_left, moving_right)
     player.draw(screen)
+    enemy.draw(screen)
     pygame.display.update()
 
     for event in pygame.event.get():
