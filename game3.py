@@ -114,7 +114,7 @@ class Soldier(pygame.sprite.Sprite):
 
         # Start a jump
         if self.jump:
-            self.vel_y = -11
+            self.vel_y = -12
             self.jump = False
 
         # Apply gravity
@@ -157,13 +157,33 @@ class Soldier(pygame.sprite.Sprite):
         surface.blit(image, self.rect)
 
 
+class Bullet:
+    def __init__(self, x, y, direction):
+        path = os.path.join(BASE_DIR, "shoot_game", "img", "icons", "bullet.png")
+        self.image = pygame.image.load(path).convert_alpha()
+        self.image = pygame.transform.scale(self.image, (24, 12))
+        self.rect = self.image.get_rect(center=(x, y))
+        self.direction = direction
+        self.speed = 12
+
+    def update(self):
+        self.rect.x += self.speed * self.direction
+
+    def draw(self, surface):
+        image = pygame.transform.flip(self.image, self.direction == -1, False)
+        surface.blit(image, self.rect)
+
+
 # Create the player and enemy
 player = Soldier("player", 200, 200, 3)
 enemy = Soldier("enemy", 400, 200, 3)
+bullets = []
 
 moving_left = False
 moving_right = False
+paused = False
 run = True
+pause_font = pygame.font.Font(None, 64)
 
 # Main game loop
 while run:
@@ -175,12 +195,23 @@ while run:
             run = False
 
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_a:
+            if event.key == pygame.K_p:
+                paused = not paused
+                moving_left = False
+                moving_right = False
+            elif event.key == pygame.K_a and not paused:
                 moving_left = True
-            elif event.key == pygame.K_d:
+            elif event.key == pygame.K_d and not paused:
                 moving_right = True
-            elif event.key == pygame.K_SPACE and player.rect.bottom >= GROUND_Y:
+            elif (
+                event.key == pygame.K_SPACE
+                and not paused
+                and player.rect.bottom >= GROUND_Y
+            ):
                 player.jump = True
+            elif event.key == pygame.K_f and not paused and player.alive:
+                bullet_x = player.rect.right if player.direction == 1 else player.rect.left
+                bullets.append(Bullet(bullet_x, player.rect.centery, player.direction))
             elif event.key == pygame.K_ESCAPE:
                 run = False
 
@@ -193,15 +224,37 @@ while run:
     # Draw the background and ground
     draw_bg()
 
-    # Update the player
-    player.move(moving_left, moving_right)
-    player.update_animation()
+    if not paused:
+        # Update the player
+        player.move(moving_left, moving_right)
+        player.update_animation()
+
+        for bullet in bullets[:]:
+            bullet.update()
+
+            if bullet.rect.right < 0 or bullet.rect.left > screen_width:
+                bullets.remove(bullet)
+            elif enemy.alive and bullet.rect.colliderect(enemy.rect):
+                bullets.remove(bullet)
+                enemy.alive = False
+
+        # Keep the enemy standing on the ground
+        if enemy.alive:
+            enemy.move(False, False)
+            enemy.update_animation()
+
     player.draw(screen)
 
-    # Keep the enemy standing on the ground
-    enemy.move(False, False)
-    enemy.update_animation()
-    enemy.draw(screen)
+    for bullet in bullets:
+        bullet.draw(screen)
+
+    if enemy.alive:
+        enemy.draw(screen)
+
+    if paused:
+        pause_text = pause_font.render("PAUSED", True, (255, 255, 255))
+        pause_rect = pause_text.get_rect(center=(screen_width // 2, screen_height // 2))
+        screen.blit(pause_text, pause_rect)
 
     pygame.display.update()
 
