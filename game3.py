@@ -43,16 +43,24 @@ def draw_bg():
 
 
 class Soldier(pygame.sprite.Sprite):
-    def __init__(self, char_type, x, y, scale):
+    def __init__(self, char_type, x, y, scale, ammo, speed):
         super().__init__()
 
         # Player settings
         self.alive = True
         self.char_type = char_type
-        self.speed = 5
+        self.speed = speed
+        self.ammo = ammo
+        self.start_ammo = ammo
+        self.health = 100
+        self.max_health = 100
+        self.shoot_cooldown = 0
         self.direction = 1
         self.vel_y = 0
         self.jump = False
+        self.in_air = True
+        self.action = 0
+        
         self.flip = False
 
         # Animation settings
@@ -65,6 +73,8 @@ class Soldier(pygame.sprite.Sprite):
         animation_types = [
             ("Idle", 5),
             ("Run", 6),
+            ("Jump", 1),
+            ("Death", 8),
         ]
 
         # Load all animation images
@@ -96,7 +106,19 @@ class Soldier(pygame.sprite.Sprite):
         # Set the starting image and position
         self.image = self.animation_list[0][0]
         self.rect = self.image.get_rect(center=(x, y))
+    
+    def update(self):
+        """Update the soldier's state."""
+        self.update_animation()
+        self.check_alive()
+       
+        #update shoot cooldown
+        if self.shoot_cooldown > 0:
+            self.shoot_cooldown -= 1
 
+        self.update_animation()
+    
+    
     def move(self, moving_left, moving_right):
         """Move the soldier and apply gravity."""
         dx = 0
@@ -147,18 +169,44 @@ class Soldier(pygame.sprite.Sprite):
 
             # Restart the animation when it reaches the end
             if self.frame_index >= len(self.animation_list[self.action]):
-                self.frame_index = 0
+               if self.action == 3:  # Death animation
+                    self.frame_index = len(self.animation_list[self.action]) - 1
+               
+            self.frame_index = 0
 
+     
             self.image = self.animation_list[self.action][self.frame_index]
+
+    def check_alive(self):
+        """Check if the soldier is alive."""
+        if self.health <= 0:
+            self.health = 0
+            self.alive = False
+            self.speed = 0
+            self.ammo = 0
+            self.shoot_cooldown = 0
 
     def draw(self, surface):
         """Draw the soldier on the screen."""
         image = pygame.transform.flip(self.image, self.flip, False)
         surface.blit(image, self.rect)
+     
+     
+        
+        
+    def shoot(self):
+        """Shoot a bullet."""
+        if self.shoot_cooldown == 0 and self.ammo > 0:
+            self.shoot_cooldown = 20
+            self.ammo -= 1
+            bullet_x = self.rect.right if self.direction == 1 else self.rect.left
+            return Bullet(bullet_x, self.rect.centery, self.direction)
+        return None
 
 
-class Bullet:
+class Bullet(pygame.sprite.Sprite):
     def __init__(self, x, y, direction):
+        super().__init__()
         path = os.path.join(BASE_DIR, "shoot_game", "img", "icons", "bullet.png")
         self.image = pygame.image.load(path).convert_alpha()
         self.image = pygame.transform.scale(self.image, (24, 12))
@@ -168,22 +216,43 @@ class Bullet:
 
     def update(self):
         self.rect.x += self.speed * self.direction
-
+        #check if the bullet is off the screen
+        if self.rect.right < 0 or self.rect.left > screen_width:
+            self.kill()
+        #check if the bullet collides with the enemy
+        if pygame.sprite.spritecollide(player, bullets, False):
+            if player.alive:
+                player.health -= 5
+                if player.health <= 0:
+                    player.alive = False
+                    self.kill()
+        
+        if pygame.sprite.spritecollide(enemy, bullets, False):
+            if enemy.alive:
+                enemy.health -= 20
+                if enemy.health <= 0:
+                    enemy.alive = False
+                    self.kill()
+                
+                enemy.alive = False 
+        
+         
     def draw(self, surface):
         image = pygame.transform.flip(self.image, self.direction == -1, False)
         surface.blit(image, self.rect)
 
 
 # Create the player and enemy
-player = Soldier("player", 200, 200, 3)
-enemy = Soldier("enemy", 400, 200, 3)
-bullets = []
+player = Soldier("player", 200, 200, 3, 20, 5)
+enemy = Soldier("enemy", 400, 200, 3, 10, 3)
+bullets = pygame.sprite.Group()
 
 moving_left = False
 moving_right = False
 paused = False
 run = True
 pause_font = pygame.font.Font(None, 64)
+shoot = False
 
 # Main game loop
 while run:
@@ -210,8 +279,9 @@ while run:
             ):
                 player.jump = True
             elif event.key == pygame.K_f and not paused and player.alive:
-                bullet_x = player.rect.right if player.direction == 1 else player.rect.left
-                bullets.append(Bullet(bullet_x, player.rect.centery, player.direction))
+                bullet = player.shoot()
+                if bullet:
+                    bullets.add(bullet)
             elif event.key == pygame.K_ESCAPE:
                 run = False
 
@@ -229,7 +299,7 @@ while run:
         player.move(moving_left, moving_right)
         player.update_animation()
 
-        for bullet in bullets[:]:
+        for bullet in bullets:
             bullet.update()
 
             if bullet.rect.right < 0 or bullet.rect.left > screen_width:
