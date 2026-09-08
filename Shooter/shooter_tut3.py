@@ -54,9 +54,9 @@ class Soldier(pygame.sprite.Sprite):
 			#reset temporary list of images
 			temp_list = []
 			#count number of files in the folder
-			num_of_frames = len(os.listdir(f'img/{self.char_type}/{animation}'))
+			num_of_frames = len(os.listdir(f'Shooter/img/{self.char_type}/{animation}'))
 			for i in range(num_of_frames):
-				img = pygame.image.load(f'img/{self.char_type}/{animation}/{i}.png')
+				img = pygame.image.load(f'Shooter/img/{self.char_type}/{animation}/{i}.png')
 				img = pygame.transform.scale(img, (int(img.get_width() * scale), int(img.get_height() * scale)))
 				temp_list.append(img)
 			self.animation_list.append(temp_list)
